@@ -18,6 +18,7 @@ modified_files/MSMAllPipeline.sh /MSMAllPipeline.sh
 modified_files/MSMAll.sh /MSMAll.sh
 modified_files/generate_level1_fsf.sh /generate_level1_fsf.sh
 modified_files/hcp_fix_multi_run /hcp_fix_multi_run
+modified_files/license.txt /license.txt
 
 %environment
 export CARET7DIR=/opt/workbench/bin_rh_linux64
@@ -53,10 +54,9 @@ export MNI_DATAPATH=/opt/freesurfer/mni/data
 export FMRI_ANALYSIS_DIR=/opt/freesurfer/fsfast
 export PERL5LIB=/opt/freesurfer/mni/lib/perl5/5.8.5
 export MNI_PERL5LIB=/opt/freesurfer/mni/lib/perl5/5.8.5
-export PATH=/opt/freesurfer/bin:/opt/freesurfer/fsfast/bin:/opt/freesurfer/tktools:/opt/freesurfer/mni/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH
 export PYTHONPATH=""
 export FSL_FIXDIR=/opt/fix
-export FSLDIR=/usr/share/fsl/5.0
+export FSLDIR=/usr/local/fsl
 export FSL_DIR="${FSLDIR}"
 export FSLOUTPUTTYPE=NIFTI_GZ
 export PATH=/usr/lib/fsl/5.0:$PATH
@@ -66,6 +66,7 @@ export LD_LIBRARY_PATH=/usr/lib/fsl/5.0
 export FSLTCLSH=/usr/bin/tclsh
 export FSLWISH=/usr/bin/wish
 export FSLOUTPUTTYPE=NIFTI_GZ
+export PATH=${FSLDIR}/bin:/opt/freesurfer/bin:/opt/freesurfer/fsfast/bin:/opt/freesurfer/tktools:/opt/freesurfer/mni/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH
 
 %post
 # Make script executable
@@ -85,11 +86,42 @@ apt-get install -y wget
 cd /
 wget https://github.umn.edu/hendr522/HCPPipelines/blob/master/modified_files/360CortSurf_19Vol_parcel.dlabel.nii
 apt-get -qq update
-apt-get install -yq --no-install-recommends bc bzip2 ca-certificates curl libgomp1 perl-modules tar tcsh wget unzip git
+apt-get install -yq --no-install-recommends python bc bzip2 ca-certificates curl libgomp1 perl-modules tar tcsh wget unzip git dc
 cd /opt
 git clone https://github.com/circulosmeos/gdown.pl.git
 
+# Install FIX 1.066, along with dependencies (MCR 2013, R 3.4.4)
+apt-get update 
+apt-get install -y build-essential libpcre3 libpcre3-dev fort77 xorg-dev libbz2-dev liblzma-dev libblas-dev gfortran gcc-multilib gobjc++ libreadline-dev bzip2 libcurl4-gnutls-dev default-jdk gdebi
+cd /opt
+/opt/gdown.pl/gdown.pl https://drive.google.com/file/d/1GKbQ404vbkDDNUmZzQePBV8CD-ETqOhV/view?usp=sharing /opt/fix.tar.gz
+tar zxvf fix.tar.gz
+rm fix.tar.gz
+mv /opt/fix* /opt/fix
+cd /opt
+wget https://cloud.r-project.org/bin/linux/ubuntu/trusty/r-base-core_3.4.4-1trusty0_amd64.deb
+wget https://cloud.r-project.org/bin/linux/ubuntu/trusty/r-base-dev_3.4.4-1trusty0_all.deb
+gdebi -n r-base-core_3.4.4-1trusty0_amd64.deb
+gdebi -n r-base-dev_3.4.4-1trusty0_all.deb
+apt-get install -y libssl-dev
+R --vanilla -e "install.packages('coin', repos='http://cran.us.r-project.org', dependencies=TRUE)" -e "install.packages('strucchange', repos='http://cran.us.r-project.org', dependencies=TRUE)" -e "install.packages('https://cran.r-project.org/src/contrib/Archive/party/party_1.0-25.tar.gz', repos=NULL, type='source')" -e "install.packages('https://cran.r-project.org/src/contrib/Archive/kernlab/kernlab_0.9-24.tar.gz', repos=NULL, type='source')" -e "install.packages('ROCR', repos='http://cran.us.r-project.org', dependencies=TRUE)" -e "install.packages('https://cran.r-project.org/src/contrib/Archive/e1071/e1071_1.6-7.tar.gz', repos=NULL, type='source')" -e "install.packages('https://cran.r-project.org/src/contrib/Archive/randomForest/randomForest_4.6-12.tar.gz', repos=NULL, type='source')"
+
+
+# Install FSL 5.0.11
+apt-get update
+cd /tmp
+wget https://fsl.fmrib.ox.ac.uk/fsldownloads/fslinstaller.py
+
+python fslinstaller.py -d /usr/local/fsl -E -V 5.0.11 -q -D
+export FSLDIR=/usr/local/fsl
+. ${FSLDIR}/etc/fslconf/fsl.sh
+PATH=${FSLDIR}/bin:${PATH}
+
+${FSLDIR}/etc/fslconf/fslpython_install.sh
+
 # Download FreeSurfer
+apt-get update
+cd /opt
 wget -qO- ftp://surfer.nmr.mgh.harvard.edu/pub/dist/freesurfer/5.3.0-HCP/freesurfer-Linux-centos4_x86_64-stable-pub-v5.3.0-HCP.tar.gz | tar zxv -C /opt \
     --exclude='freesurfer/trctrain' \
     --exclude='freesurfer/subjects/fsaverage_sym' \
@@ -106,25 +138,12 @@ wget -qO- ftp://surfer.nmr.mgh.harvard.edu/pub/dist/freesurfer/5.3.0-HCP/freesur
     --exclude='freesurfer/lib/qt'
 apt-get install -y tcsh bc tar libgomp1 perl-modules curl
 
-curl -sSL http://neuro.debian.net/lists/trusty.us-ca.full >> /etc/apt/sources.list.d/neurodebian.sources.list
-
-sed -i -e 's,main *$,main contrib non-free,g' /etc/apt/sources.list.d/neurodebian.sources.list
-grep -q 'deb .* multiverse$' /etc/apt/sources.list || sed -i -e 's,universe *$,universe multiverse,g' /etc/apt/sources.list
-
-# Install FSL 5.0.9
-apt-get update
-apt-get install -y --no-install-recommends curl
-curl -sSL http://neuro.debian.net/lists/trusty.us-ca.full >> /etc/apt/sources.list.d/neurodebian.sources.list
-apt-key adv --recv-keys --keyserver hkp://pgp.mit.edu:80 0xA5D32F012649A5A9
-apt-get update
-apt-get install -y fsl-core=5.0.9-4~nd14.04+1
-apt-get build-dep -y gridengine && apt-get update -y
 
 # Install HCP Pipelines v3.27.0
 apt-get update
 apt-get install -y --no-install-recommends python-numpy
+cd /opt
 wget https://github.com/Washington-University/Pipelines/archive/v3.27.0.tar.gz -O pipelines.tar.gz
-cd /opt/
 mkdir /opt/HCP-Pipelines
 tar zxf /opt/pipelines.tar.gz -C /opt/HCP-Pipelines --strip-components=1
 rm /opt/pipelines.tar.gz
@@ -133,35 +152,21 @@ mv /tmp/homes/ecr05/MSM_HOCR_v2/Ubuntu /opt/HCP-Pipelines/MSMBinaries
 apt-get clean
 rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Install FIX 1.066, along with dependencies (MCR 2013, R 3.4.4)
-apt-get update && apt-get install -y build-essential libpcre3 libpcre3-dev fort77 xorg-dev libbz2-dev liblzma-dev libblas-dev gfortran gcc-multilib gobjc++ libreadline-dev bzip2 libcurl4-gnutls-dev default-jdk gdebi
-cd /opt
-/opt/gdown.pl/gdown.pl https://drive.google.com/file/d/1GKbQ404vbkDDNUmZzQePBV8CD-ETqOhV/view?usp=sharing /opt/fix.tar.gz
-tar zxvf fix.tar.gz
-rm fix.tar.gz
-mv /opt/fix* /opt/fix
-cd /opt
-wget https://cloud.r-project.org/bin/linux/ubuntu/trusty/r-base-core_3.4.4-1trusty0_amd64.deb
-wget https://cloud.r-project.org/bin/linux/ubuntu/trusty/r-base-dev_3.4.4-1trusty0_all.deb
-gdebi -n r-base-core_3.4.4-1trusty0_amd64.deb
-gdebi -n r-base-dev_3.4.4-1trusty0_all.deb
-apt-get install -y libssl-dev
-R --vanilla -e "install.packages('coin', repos='http://cran.us.r-project.org', dependencies=TRUE)" -e "install.packages('strucchange', repos='http://cran.us.r-project.org', dependencies=TRUE)" -e "install.packages('https://cran.r-project.org/src/contrib/Archive/party/party_1.0-25.tar.gz', repos=NULL, type='source')" -e "install.packages('https://cran.r-project.org/src/contrib/Archive/kernlab/kernlab_0.9-24.tar.gz', repos=NULL, type='source')" -e "install.packages('ROCR', repos='http://cran.us.r-project.org', dependencies=TRUE)" -e "install.packages('https://cran.r-project.org/src/contrib/Archive/e1071/e1071_1.6-7.tar.gz', repos=NULL, type='source')" -e "install.packages('https://cran.r-project.org/src/contrib/Archive/randomForest/randomForest_4.6-12.tar.gz', repos=NULL, type='source')"
-
-chmod a+rwx -R /usr/lib/fsl/5.0/ /opt/fix/ /opt/HCP-Pipelines/PostFix/ /opt/HCP-Pipelines/PostFix/Compiled_prepareICAs/ /opt/HCP-Pipelines/RestingStateStats/ /opt/HCP-Pipelines/RestingStateStats/Compiled_RestingStateStats/distrib/ /opt/HCP-Pipelines/MSMAll/scripts/Compiled_ComputeVN/ /opt/HCP-Pipelines/MSMAll/ /opt/HCP-Pipelines/MSMAll/scripts/ /opt/HCP-Pipelines/Examples/Scripts/ /fsl_sub /settings.sh /PostFix.sh /run_prepareICAs.sh /RestingStateStats.sh /run_RestingStateStats.sh /run_RestingStateStats.sh /run_ComputeVN.sh /MSMAllPipeline.sh /MSMAll.sh /generate_level1_fsf.sh /hcp_fix_multi_run /fsl_sub /settings.sh /PostFix.sh /run_prepareICAs.sh /RestingStateStats.sh /run_RestingStateStats.sh /hcp_fix_multi_run /generate_level1_fsf.sh /run_ComputeVN.sh /MSMAllPipeline.sh /MSMAll.sh
+#chmod a+rwx -R /usr/lib/fsl/5.0/ /opt/fix/ /opt/HCP-Pipelines/ /opt/freesurfer /license.txt /fsl_sub /settings.sh /PostFix.sh /run_prepareICAs.sh /RestingStateStats.sh /run_RestingStateStats.sh /#run_RestingStateStats.sh /run_ComputeVN.sh /MSMAllPipeline.sh /MSMAll.sh /generate_level1_fsf.sh /hcp_fix_multi_run /fsl_sub /settings.sh /PostFix.sh /run_prepareICAs.sh /RestingStateStats.sh /#run_RestingStateStats.sh /hcp_fix_multi_run /generate_level1_fsf.sh /run_ComputeVN.sh /MSMAllPipeline.sh /MSMAll.sh
 
 cd /opt/HCP-Pipelines/Examples/Scripts/
 cp /generate_level1_fsf.sh .
 cp /run_ComputeVN.sh /opt/HCP-Pipelines/MSMAll/scripts/Compiled_ComputeVN/run_ComputeVN.sh
 cp /MSMAllPipeline.sh /opt/HCP-Pipelines/MSMAll/MSMAllPipeline.sh
 cp /MSMAll.sh /opt/HCP-Pipelines/MSMAll/scripts/MSMAll.sh
-cp /fsl_sub /usr/lib/fsl/5.0/fsl_sub
+cp /fsl_sub /usr/local/fsl/bin/fsl_sub
 cp /settings.sh /opt/fix/settings.sh
 cp /PostFix.sh /opt/HCP-Pipelines/PostFix/PostFix.sh
 cp /run_prepareICAs.sh /opt/HCP-Pipelines/PostFix/Compiled_prepareICAs/run_prepareICAs.sh
 cp /RestingStateStats.sh /opt/HCP-Pipelines/RestingStateStats/RestingStateStats.sh
 cp /run_RestingStateStats.sh /opt/HCP-Pipelines/RestingStateStats/Compiled_RestingStateStats/distrib/run_RestingStateStats.sh
 cp /hcp_fix_multi_run /opt/fix/hcp_fix_multi_run
+cp /license.txt /opt/freesurfer/license.txt
 
 mkdir /tmp/v83
 cp /opt/fix*/compiled/Linux/x86_64/MCRInstaller.zip /tmp/v83
@@ -205,6 +210,7 @@ pip install git+https://github.com/INCF/pybids.git@0.6.0
 
 # install gradient_unwarp.py (v1.0.3)
 pip install https://github.com/Washington-University/gradunwarp/archive/v1.0.3.zip
+pip install nibabel --upgrade
 
 # upgrade our libstdc++
 echo "deb http://ftp.de.debian.org/debian stretch main" >> /etc/apt/sources.list
@@ -220,3 +226,4 @@ ln -s /usr/lib/x86_64-linux-gnu/libstdc++.so.6 /usr/local/R2016b/v91/sys/os/glnx
 %runscript
 
 exec /run.py "$@"
+
